@@ -136,12 +136,8 @@ def add_to_cart(item_id):
     product = Product.query.get_or_404(item_id)
     option = request.form.get('option', 'ร้อน')
     
-    # คำนวณราคาเพิ่มตามตัวเลือก
+    # ราคาทั้งร้อนและเย็นเท่ากัน ใช้ราคาตั้งต้นได้เลย
     final_price = product.price
-    if option == 'เย็น':
-        final_price += 5
-    elif option == 'ปั่น':
-        final_price += 10
         
     item_name = f"{product.name} ({option})"
     cart = session.get('cart', [])
