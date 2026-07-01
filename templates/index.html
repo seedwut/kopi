@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CoffeeStream - สั่งกาแฟออนไลน์</title>
+    <title>KOPI Coffee Van - สั่งกาแฟออนไลน์</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 40px; background-color: #f9f6f0; color: #333; }
         /* จัดกล่องให้รองรับการหด/ขยาย */
@@ -49,6 +49,16 @@
     </style>
 </head>
 <body>
+    <div style="display: flex; justify-content: flex-end; padding: 10px 20px; background-color: #ebe4d9; border-bottom: 1px solid #d4cdbe;">
+        {% if current_user %}
+            <span style="color: #4a3b32; font-weight: bold; margin-right: 15px;">
+                👤 คุณ {{ current_user.username }} | ⭐ แต้ม: <span style="color: #d2691e;">{{ current_user.points }}</span>
+            </span>
+            <a href="{{ url_for('logout') }}" style="color: #e74c3c; text-decoration: none; font-size: 14px;">ออกจากระบบ</a>
+        {% else %}
+            <a href="{{ url_for('login') }}" style="color: #6f4e37; text-decoration: none; font-weight: bold; font-size: 14px;">เข้าสู่ระบบ / สมัครสมาชิก เพื่อสะสมแต้ม!</a>
+        {% endif %}
+    </div>
     <div style="text-align: center; margin-bottom: 20px;">
         <img src="{{ url_for('static', filename='logo.png') }}" alt="โลโก้ร้าน" style="max-height: 100px; mix-blend-mode: multiply;">
         <h1 style="color: #4a3b32; margin-top: 10px; margin-bottom: 0;">KOPI Coffee Van
