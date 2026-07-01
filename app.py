@@ -5,10 +5,12 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from flask_migrate import Migrate
 
 app = Flask(__name__)
 app.secret_key = 'coffee_secret_key'
 
+# --- ตั้งค่า Database รองรับทั้ง SQLite (ในเครื่อง) และ PostgreSQL (บน Render) ---
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///coffee_shop.db')
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
@@ -21,25 +23,25 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)  # เรียกใช้งาน Flask-Migrate
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # -----------------------------------------
-# Database Models
+# 1. Database Models (โครงสร้างฐานข้อมูล)
 # -----------------------------------------
-# ตารางสำหรับสมาชิกลูกค้า
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
-    points = db.Column(db.Integer, default=0) # แต้มสะสมเริ่มต้นที่ 0
+    points = db.Column(db.Integer, default=0) # แต้มสะสมลูกค้า
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Integer, nullable=False)
-    image_file = db.Column(db.String(200), nullable=True)
+    image_file = db.Column(db.String(200), nullable=True) # รูปภาพสินค้า
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -54,16 +56,18 @@ class OrderItem(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
     product_name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Integer, nullable=False) 
-    quantity = db.Column(db.Integer, default=1)   
+    quantity = db.Column(db.Integer, default=1) # จำนวนสินค้าในแต่ละรายการ
 
+# ข้อมูลสำหรับ Admin Login
 ADMIN_USERNAME = 'admin'
 ADMIN_PASSWORD = 'coffee1234'
 
 def is_admin_logged_in():
     return session.get('admin_logged_in') == True
 
+
 # -----------------------------------------
-# ระบบสมาชิกลูกค้า (Customer Auth)
+# 2. ระบบสมาชิกลูกค้า (Customer Auth)
 # -----------------------------------------
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -77,7 +81,7 @@ def register():
             flash("ชื่อผู้ใช้นี้มีคนใช้แล้วครับ กรุณาใช้ชื่ออื่น", "error")
             return redirect(url_for('register'))
             
-        # เข้ารหัสรหัสผ่านก่อนเซฟเพื่อความปลอดภัย
+        # เข้ารหัสรหัสผ่านก่อนบันทึกลงฐานข้อมูล
         hashed_password = generate_password_hash(password)
         new_user = User(username=username, password=hashed_password)
         db.session.add(new_user)
@@ -110,8 +114,9 @@ def logout():
     flash("ออกจากระบบเรียบร้อยแล้ว", "success")
     return redirect(url_for('home'))
 
+
 # -----------------------------------------
-# Routes (Frontend)
+# 3. Routes สำหรับหน้าร้านและตะกร้า (Frontend)
 # -----------------------------------------
 @app.route('/')
 def home():
@@ -119,7 +124,7 @@ def home():
     cart = session.get('cart', [])
     total_price = sum(item['price'] * item.get('quantity', 1) for item in cart)
     
-    # ดึงข้อมูลผู้ใช้ปัจจุบันเพื่อแสดงแต้ม
+    # ตรวจสอบว่าลูกค้าเข้าสู่ระบบอยู่หรือไม่
     current_user = None
     if 'user_id' in session:
         current_user = User.query.get(session['user_id'])
@@ -131,6 +136,7 @@ def add_to_cart(item_id):
     product = Product.query.get_or_404(item_id)
     option = request.form.get('option', 'ร้อน')
     
+    # คำนวณราคาเพิ่มตามตัวเลือก
     final_price = product.price
     if option == 'เย็น':
         final_price += 5
@@ -140,6 +146,7 @@ def add_to_cart(item_id):
     item_name = f"{product.name} ({option})"
     cart = session.get('cart', [])
     
+    # ตรวจสอบของซ้ำในตะกร้า
     found = False
     for item in cart:
         if item['id'] == product.id and item['name'] == item_name:
@@ -188,14 +195,14 @@ def checkout():
         flash("ตะกร้าว่างเปล่า กรุณาเลือกสินค้าก่อนครับ", "error")
         return redirect(url_for('home'))
     
-    # ถ้าล็อกอินอยู่ ให้ใช้ชื่อ username แต่ถ้าไม่ได้ล็อกอิน ให้รับค่าจากฟอร์ม
+    # ใช้ชื่อจากระบบสมาชิก (ถ้ามี) หรือรับจากฟอร์ม
     customer_name = session.get('username') or request.form.get('customer_name')
     total_price = sum(item['price'] * item.get('quantity', 1) for item in cart)
     
     new_order = Order(customer_name=customer_name, total_price=total_price)
     db.session.add(new_order)
     
-    # แจกแต้มสะสม (ทุก 10 บาท ได้ 1 แต้ม)
+    # ระบบแจกแต้มสะสม (ทุก 10 บาท ได้ 1 แต้ม)
     earned_points = 0
     if 'user_id' in session:
         user = User.query.get(session['user_id'])
@@ -226,12 +233,10 @@ def receipt(order_id):
     order = Order.query.get_or_404(order_id)
     return render_template('receipt.html', order=order)
 
-# -----------------------------------------
-# Routes (Admin)
-# -----------------------------------------
-# (ส่วนนี้ยังเหมือนเดิมทุกประการ เพื่อประหยัดพื้นที่บทความครับ)
-# ... ให้คุณนำโค้ด Route ส่วนของ Admin เดิมมาวางต่อตรงนี้ได้เลยครับ ...
 
+# -----------------------------------------
+# 4. Routes สำหรับระบบจัดการหลังร้าน (Admin)
+# -----------------------------------------
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     if is_admin_logged_in():
@@ -247,19 +252,30 @@ def admin_login():
 @app.route('/admin/logout')
 def admin_logout():
     session.pop('admin_logged_in', None)
+    flash("ออกจากระบบหลังบ้านเรียบร้อย", "success")
     return redirect(url_for('admin_login'))
 
 @app.route('/admin')
 def admin_dashboard():
     if not is_admin_logged_in():
         return redirect(url_for('admin_login'))
+        
     orders = Order.query.order_by(Order.created_at.desc()).all()
     products = Product.query.all()
+    
+    # สรุปข้อมูล Dashboard
     total_orders = len(orders)
     pending_orders = sum(1 for order in orders if order.status == 'Pending')
     completed_orders = sum(1 for order in orders if order.status == 'Completed')
     total_revenue = sum(order.total_price for order in orders if order.status == 'Completed')
-    return render_template('admin.html', orders=orders, products=products, total_orders=total_orders, pending_orders=pending_orders, completed_orders=completed_orders, total_revenue=total_revenue)
+    
+    return render_template('admin.html', 
+                           orders=orders, 
+                           products=products, 
+                           total_orders=total_orders, 
+                           pending_orders=pending_orders, 
+                           completed_orders=completed_orders, 
+                           total_revenue=total_revenue)
 
 @app.route('/admin/complete/<int:order_id>')
 def complete_order(order_id):
@@ -276,24 +292,30 @@ def delete_order(order_id):
     order = Order.query.get_or_404(order_id)
     db.session.delete(order)
     db.session.commit()
+    flash(f"ลบออเดอร์ #{order.id} ออกจากระบบเรียบร้อยแล้ว", "success")
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/add_product', methods=['POST'])
 def add_product():
     if not is_admin_logged_in():
         return "Unauthorized", 403
+        
     name = request.form.get('name')
     price = request.form.get('price')
     image = request.files.get('image') 
+    
     filename = None
     if image and allowed_file(image.filename):
         ext = image.filename.rsplit('.', 1)[1].lower()
-        filename = f"{uuid.uuid4().hex}.{ext}"
+        filename = f"{uuid.uuid4().hex}.{ext}" # ป้องกันภาษาไทยด้วย UUID
         image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        
     if name and price:
         new_product = Product(name=name, price=int(price), image_file=filename)
         db.session.add(new_product)
         db.session.commit()
+        flash(f"เพิ่มเมนู '{name}' สำเร็จ!", "success")
+        
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/delete_product/<int:product_id>')
@@ -302,11 +324,18 @@ def delete_product(product_id):
         product = Product.query.get_or_404(product_id)
         db.session.delete(product)
         db.session.commit()
+        flash(f"ลบเมนู '{product.name}' เรียบร้อยแล้ว", "success")
     return redirect(url_for('admin_dashboard'))
 
+# -----------------------------------------
+# การเตรียมระบบ (Setup)
+# -----------------------------------------
 with app.app_context():
+    # สร้างโฟลเดอร์สำหรับเก็บภาพอัปโหลดอัตโนมัติหากยังไม่มี
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    db.create_all()
+    
+    # หมายเหตุ: เราลบ db.create_all() ออกไปแล้ว 
+    # เนื่องจากเราใช้ Flask-Migrate เป็นตัวจัดการฐานข้อมูลแทนครับ
 
 if __name__ == '__main__':
     app.run(debug=True)
