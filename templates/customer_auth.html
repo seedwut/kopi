@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สมาชิก - CoffeeStream</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f9f6f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .auth-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
+        h2 { color: #6f4e37; margin-bottom: 25px; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; }
+        button { width: 100%; background-color: #6f4e37; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.3s; }
+        button:hover { background-color: #5c4033; }
+        a { color: #6f4e37; text-decoration: none; font-size: 14px; display: inline-block; margin-top: 15px; }
+        .alert { padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 14px; text-align: left; }
+        .alert-error { background-color: #f8d7da; color: #721c24; }
+        .alert-success { background-color: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <div class="auth-box">
+        {% if action == 'login' %}
+            <h2>เข้าสู่ระบบ</h2>
+        {% else %}
+            <h2>สมัครสมาชิกใหม่</h2>
+        {% endif %}
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for(action) }}" method="POST">
+            <input type="text" name="username" required placeholder="ชื่อผู้ใช้ (Username)">
+            <input type="password" name="password" required placeholder="รหัสผ่าน (Password)">
+            <button type="submit">{{ 'เข้าสู่ระบบ' if action == 'login' else 'ยืนยันการสมัคร' }}</button>
+        </form>
+        
+        {% if action == 'login' %}
+            <p style="font-size: 14px;">ยังไม่มีบัญชี? <a href="{{ url_for('register') }}" style="margin: 0; font-weight: bold;">สมัครสมาชิก</a></p>
+        {% else %}
+            <p style="font-size: 14px;">มีบัญชีอยู่แล้ว? <a href="{{ url_for('login') }}" style="margin: 0; font-weight: bold;">เข้าสู่ระบบ</a></p>
+        {% endif %}
+        <a href="{{ url_for('home') }}" style="color: gray;">← กลับหน้าร้าน</a>
+    </div>
+</body>
+</html>
