@@ -29,6 +29,9 @@ def set_shop_status(status):
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+# 📌 เพิ่ม 2 บรรทัดนี้ เพื่อให้ Render สร้างตารางฐานข้อมูลอัตโนมัติ
+with app.app_context():
+    db.create_all()
 # ==========================================
 # 1. โครงสร้างฐานข้อมูล (Models)
 # ==========================================
