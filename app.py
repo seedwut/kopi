@@ -9,6 +9,12 @@ import requests
 
 app = Flask(__name__)
 app.secret_key = 'kopi_super_secret_key'
+# 📌 ตั้งค่าฐานข้อมูล: ใช้ PostgreSQL บน Cloud หรือใช้ SQLite ตอนทำในคอม
+db_url = os.environ.get('DATABASE_URL', 'sqlite:///coffee_shop.db')
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///coffee_shop.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
@@ -405,8 +411,8 @@ def update_order_status(order_id, status):
         order.status = status
         db.session.commit()
         
-    return redirect(url_for('admin_dashboard'))
-    with app.app_context():
-        db.create_all()
+return redirect(url_for('admin_dashboard'))
+with app.app_context():
+db.create_all()
 if __name__ == '__main__':
-       app.run(debug=True)
+app.run(debug=True)
