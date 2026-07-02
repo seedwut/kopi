@@ -10,10 +10,14 @@ import requests
 app = Flask(__name__)
 app.secret_key = 'kopi_super_secret_key'
 
-# 📌 ตั้งค่าฐานข้อมูล: ใช้ PostgreSQL บน Cloud หรือใช้ SQLite ตอนทำในคอม
+# 📌 ตั้งค่าฐานข้อมูล: ใช้ PostgreSQL บน Cloud (ผ่าน pg8000) หรือใช้ SQLite ตอนทำในคอม
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///coffee_shop.db')
+
+# แปลงลิงก์ postgres:// หรือ postgresql:// ให้ใช้ pg8000
 if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+    db_url = db_url.replace("postgres://", "postgresql+pg8000://", 1)
+elif db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresqlNormally I can help with things like this, but I don't seem to have access to that content. You can try again or ask me for something else.
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
