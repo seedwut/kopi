@@ -357,7 +357,36 @@ def delete_product(product_id):
     flash("ลบเมนูออกจากร้านเรียบร้อย!", "success")
     return redirect(url_for('admin_dashboard'))
 
-
+# 📌 โค้ดสำหรับให้แอดมินแก้ไขเมนูและเปลี่ยนรูปภาพ
+@app.route('/admin/edit_product/<int:product_id>', methods=['POST'])
+def edit_product(product_id):
+    if not is_admin_logged_in(): return redirect(url_for('admin_login'))
+    product = Product.query.get_or_404(product_id)
+    
+    # อัปเดตชื่อและราคา
+    product.name = request.form.get('name', product.name)
+    product.price = request.form.get('price', product.price)
+    
+    # ถ้ามีการอัปโหลดรูปภาพใหม่
+    image = request.files.get('image')
+    if image and allowed_file(image.filename):
+        # ลบไฟล์รูปเก่าทิ้ง (เพื่อประหยัดพื้นที่)
+        if product.image_file:
+            old_path = os.path.join(app.config['UPLOAD_FOLDER'], product.image_file)
+            if os.path.exists(old_path): 
+                try: os.remove(old_path)
+                except: pass
+        
+        # เซฟไฟล์รูปใหม่
+        ext = image.filename.rsplit('.', 1)[1].lower()
+        filename = f"product_{uuid.uuid4().hex}.{ext}"
+        image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        product.image_file = filename
+        
+    db.session.commit()
+    flash(f"อัปเดตข้อมูลเมนู {product.name} เรียบร้อย!", "success")
+    return redirect(url_for('admin_dashboard'))
+    
 @app.route('/admin/complete/<int:order_id>')
 def complete_order(order_id):
     if not is_admin_logged_in(): return redirect(url_for('admin_login'))
