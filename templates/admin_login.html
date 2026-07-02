@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เข้าสู่ระบบแอดมิน - KOPI Coffee Van</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f4f6f9; color: #333; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-box { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0 20px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        .btn { background-color: #4a3b32; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; font-size: 16px; }
+        .btn:hover { background-color: #382c25; }
+        .flash-error { color: #721c24; background-color: #f8d7da; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h2 style="color: #4a3b32; margin-top: 0;">☕ KOPI ระบบหลังบ้าน</h2>
+        
+        <!-- แจ้งเตือนเวลาพิมพ์รหัสผิด -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-error">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <div style="text-align: left;">
+                <label style="font-weight: bold; font-size: 14px;">ชื่อผู้ใช้ (Username)</label>
+                <input type="text" name="username" required placeholder="admin">
+                
+                <label style="font-weight: bold; font-size: 14px;">รหัสผ่าน (Password)</label>
+                <input type="password" name="password" required placeholder="1234">
+            </div>
+            
+            <button type="submit" class="btn">เข้าสู่ระบบ</button>
+        </form>
+        <br>
+        <a href="{{ url_for('home') }}" style="color: #888; font-size: 14px; text-decoration: none;">← กลับไปหน้าร้าน</a>
+    </div>
+</body>
+</html>

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบหลังบ้าน - KOPI Coffee Van</title>
+		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }
+        .dashboard-header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        
+        /* สไตล์ของกล่องสรุปยอด */
+        .stat-container { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-box { flex: 1; min-width: 150px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); text-align: center; }
+        .stat-box h3 { margin: 0 0 10px 0; color: #666; font-size: 16px; }
+        .stat-box .number { font-size: 24px; font-weight: bold; color: #4a3b32; }
+        
+        /* สไตล์ของตาราง */
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; margin-bottom: 30px; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #4a3b32; color: white; }
+        tr:hover { background-color: #f9f9f9; }
+        
+        /* ปุ่มต่างๆ */
+        .btn { padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold; display: inline-block; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn-logout { background-color: #e74c3c; color: white; padding: 8px 15px; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .badge-pending { background-color: #ffeeba; color: #856404; }
+        .badge-paid { background-color: #cce5ff; color: #004085; }
+        .badge-completed { background-color: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-header">
+        <h2 style="margin: 0; color: #4a3b32;">☕ KOPI Admin Dashboard</h2>
+        
+        <div>
+            <button onclick="enableSound()" class="btn btn-success" style="margin-right: 10px;">🔊 เปิดระบบเสียงเตือน</button>
+            <a href="{{ url_for('admin_logout') }}" class="btn btn-logout">ออกจากระบบ</a>
+        </div>
+    </div>
+
+    <!-- กล่องสรุปสถิติ -->
+    <div class="stat-container">
+        <div class="stat-box">
+            <h3>ออเดอร์ทั้งหมด</h3>
+            <div class="number">{{ total_orders }}</div>
+        </div>
+        <div class="stat-box">
+            <h3>ออเดอร์รอดำเนินการ</h3>
+            <div class="number" style="color: #e67e22;">{{ pending_orders }}</div>
+        </div>
+        <div class="stat-box">
+            <h3>รายได้รวม</h3>
+            <div class="number" style="color: #27ae60;">{{ total_revenue }} ฿</div>
+        </div>
+    </div>
+	
+	<!-- 📌 กราฟสรุปยอดขาย 7 วันล่าสุด -->
+    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 30px;">
+        <h3 style="margin: 0 0 20px 0; color: #4a3b32;">📈 สรุปยอดขาย 7 วันล่าสุด</h3>
+        <div style="position: relative; height: 300px; width: 100%;">
+            <canvas id="salesChart"></canvas>
+        </div>
+    </div>
+
+    <!-- 📌 ระบบควบคุมการเปิด-ปิดร้าน -->
+    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <div>
+            <h3 style="margin: 0; color: #4a3b32;">สถานะหน้าร้านปัจจุบัน: 
+                {% if shop_open %}
+                    <span style="color: #28a745;">✅ เปิดรับออเดอร์</span>
+                {% else %}
+                    <span style="color: #dc3545;">❌ ปิดร้านชั่วคราว</span>
+                {% endif %}
+            </h3>
+        </div>
+        <a href="{{ url_for('toggle_status') }}" class="btn {% if shop_open %}btn-danger{% else %}btn-success{% endif %}" style="padding: 10px 20px; font-size: 16px;">
+            {% if shop_open %}🛑 กดเพื่อปิดร้าน{% else %}🟢 กดเพื่อเปิดร้าน{% endif %}
+        </a>
+    </div>
+
+    <!-- ตารางจัดการออเดอร์ -->
+    <h3 style="color: #4a3b32;">📋 รายการออเดอร์ล่าสุด</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>คิว #</th>
+                <th>ลูกค้า</th>
+                <th>รายการเครื่องดื่ม</th>
+                <th>ยอดรวม</th>
+                <th>สถานะ</th>
+                <th>จัดการ</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <!-- 📌 โชว์เลขคิวตัวเด่นๆ -->
+                <td>
+                    <strong style="font-size: 18px; color: #e67e22;">{{ order.queue_number or 'Q00' }}</strong><br>
+                    <small style="color: gray;">#{{ order.id }} ({{ order.created_at.strftime('%H:%M') }})</small>
+                </td>
+                <td>
+                    {{ order.customer_name }}
+                    
+                    {% if order.slip_image %}
+                        <br>
+                        <a href="{{ url_for('static', filename='uploads/' + order.slip_image) }}" target="_blank" style="color: #28a745; font-size: 13px;">
+                            🔍 ดูรูปสลิป
+                        </a>
+                    {% endif %}
+                </td>
+                <td>
+                    <ul style="margin: 0; padding-left: 15px; font-size: 14px;">
+                        {% for item in order.items %}
+                            <li>{{ item.product_name }} <span style="color: #e67e22;">(หวาน {{ item.sweetness }})</span> (x{{ item.quantity }})</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+                <td><strong>{{ order.total_price }} ฿</strong></td>
+                <td>
+                    {% if order.status == 'Pending' %}
+                        <span class="badge badge-pending">รอชำระเงิน</span>
+                    {% elif order.status == 'Paid' %}
+                        <span class="badge badge-paid">แนบสลิปแล้ว</span>
+                    {% elif order.status == 'Brewing' %}
+                        <span class="badge" style="background-color: #fcf3cf; color: #d68910;">กำลังชง ☕</span>
+                    {% elif order.status == 'Ready' %}
+                        <span class="badge" style="background-color: #d5f5e3; color: #27ae60;">พร้อมเสิร์ฟ 🛎️</span>
+                    {% else %}
+                        <span class="badge badge-completed">เสร็จสิ้น ✅</span>
+                    {% endif %}
+                </td>
+               <td style="display: flex; gap: 5px; flex-wrap: wrap;">
+                    
+                    <a href="{{ url_for('print_receipt', order_id=order.id) }}" target="_blank" class="btn" style="background-color: #17a2b8; color: white;" title="พิมพ์ใบเสร็จแปะแก้ว">🖨️ พิมพ์</a>
+                    
+                    <!-- 📌 ปุ่มเปลี่ยนสถานะตาม Workflow -->
+                    {% if order.status in ['Pending', 'Paid'] %}
+                        <a href="{{ url_for('update_order_status', order_id=order.id, status='Brewing') }}" class="btn" style="background-color: #f39c12; color: white;">☕ กำลังชง</a>
+                    {% elif order.status == 'Brewing' %}
+                        <a href="{{ url_for('update_order_status', order_id=order.id, status='Ready') }}" class="btn" style="background-color: #00B900; color: white;">🛎️ พร้อมเสิร์ฟ</a>
+                    {% elif order.status == 'Ready' %}
+                        <a href="{{ url_for('update_order_status', order_id=order.id, status='Completed') }}" class="btn btn-success">✅ รับของแล้ว</a>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('delete_order', order_id=order.id) }}" class="btn btn-danger" onclick="return confirm('แน่ใจหรือไม่ว่าต้องการลบออเดอร์นี้?');">🗑️ ลบ</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="text-align: center; color: gray; padding: 20px;">ยังไม่มีออเดอร์ในขณะนี้</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+   <!-- ระบบจัดการเมนูเครื่องดื่ม -->
+    <h3 style="color: #4a3b32; margin-top: 40px;">📝 จัดการเมนูเครื่องดื่ม</h3>
+    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 30px;">
+        
+        <!-- 📌 แก้ไขฟอร์ม: เพิ่ม enctype และช่อง input type="file" -->
+        <form action="{{ url_for('add_product') }}" method="POST" enctype="multipart/form-data" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
+            <input type="text" name="name" placeholder="ชื่อเมนูใหม่" required style="flex: 2; min-width: 150px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+            <input type="number" name="price" placeholder="ราคา (฿)" required style="flex: 1; min-width: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+            
+            <!-- ช่องเลือกไฟล์รูปภาพ -->
+            <input type="file" name="image" accept="image/*" style="flex: 2; min-width: 150px; padding: 5px;">
+            
+            <button type="submit" class="btn btn-success">➕ เพิ่มเมนู</button>
+        </form>
+        
+        <!-- ตารางแสดงเมนูทั้งหมด -->
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 80px; text-align: center;">รูปภาพ</th>
+                    <th>ชื่อเมนู</th>
+                    <th>ราคา</th>
+                    <th style="text-align: center;">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in products %}
+                <tr>
+                    <td style="text-align: center;">
+                        {% if p.image_file %}
+                            <img src="{{ url_for('static', filename='uploads/' + p.image_file) }}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        {% else %}
+                            <div style="font-size: 30px;">☕</div>
+                        {% endif %}
+                    </td>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.price }} ฿</td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('delete_product', product_id=p.id) }}" class="btn btn-danger" onclick="return confirm('ต้องการลบเมนู {{ p.name }} ใช่ไหม?');">🗑️ ลบ</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align: center; color: gray;">หน้าร้านยังไม่มีเมนูเลยครับ ลองเพิ่มเมนูแรกดูสิ!</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+	
+<!-- ระบบจัดการสมาชิก (เปลี่ยนรหัสผ่าน) -->
+    <h3 style="color: #4a3b32; margin-top: 40px;">👥 จัดการสมาชิกลูกค้า</h3>
+    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 30px;">
+        <table>
+            <thead>
+                <tr>
+                    <th>ชื่อผู้ใช้ (Username)</th>
+                    <th>แต้มสะสม</th>
+                    <th>ตั้งรหัสผ่านใหม่</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td><strong>{{ u.username }}</strong></td>
+                    <td style="color: #d2691e; font-weight: bold;">{{ u.points }} ⭐</td>
+                    <td>
+                        <form action="{{ url_for('admin_reset_password', user_id=u.id) }}" method="POST" style="display: flex; gap: 10px;">
+                            <input type="text" name="new_password" placeholder="รหัสผ่านใหม่" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 120px;">
+                            <button type="submit" class="btn btn-success" style="padding: 8px 12px; font-size: 13px;">บันทึก</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" style="text-align: center; color: gray;">ยังไม่มีสมาชิกในระบบ</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+	
+    <!-- ไฟล์เสียงและสคริปต์การแจ้งเตือน ให้อยู่ล่างสุด -->
+    <audio id="notificationSound" preload="auto">
+        <source src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        let currentLatestId = {% if orders %}{{ orders[0].id }}{% else %}0{% endif %};
+        
+        function enableSound() {
+            let audio = document.getElementById('notificationSound');
+            audio.play().then(() => {
+                audio.pause();
+                audio.currentTime = 0;
+                alert("✅ เปิดระบบเสียงเตือนเรียบร้อยแล้วครับ! ถัดจากนี้เสียงจะดังอัตโนมัติ");
+            }).catch(error => {
+                console.log("Error:", error);
+            });
+        }
+
+        function checkNewOrders() {
+            fetch("{{ url_for('check_updates') }}")
+                .then(response => response.json())
+                .then(data => {
+                    if (data.latest_id > currentLatestId) {
+                        let audio = document.getElementById('notificationSound');
+                        
+                        let playPromise = audio.play();
+                        
+                        if (playPromise !== undefined) {
+                            playPromise.then(_ => {
+                                setTimeout(() => {
+                                    location.reload();
+                                }, 1500);
+                            }).catch(error => {
+                                console.log("เบราว์เซอร์บล็อกเสียง กรุณากดปุ่มเปิดเสียงก่อน");
+                                location.reload();
+                            });
+                        }
+                    }
+                })
+                .catch(err => console.log("กำลังรอการเชื่อมต่อ...", err));
+        }
+        
+        setInterval(checkNewOrders, 10000);
+    </script>
+	
+	<!-- 📌 สคริปต์สำหรับวาดกราฟยอดขาย -->
+    <script>
+        const ctx = document.getElementById('salesChart').getContext('2d');
+        
+        // รับค่าข้อมูลจาก Python ที่เราส่งมา (ใช้ safe filter เพื่อให้ข้อมูลเป็น array ของ JavaScript)
+        const labels = {{ sales_labels | safe }};
+        const dataValues = {{ sales_values | safe }};
+        
+        new Chart(ctx, {
+            type: 'bar', // เปลี่ยนเป็น 'line' ได้ถ้าอยากได้กราฟเส้น
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'ยอดขาย (บาท)',
+                    data: dataValues,
+                    backgroundColor: 'rgba(39, 174, 96, 0.7)',
+                    borderColor: 'rgba(39, 174, 96, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) { return value + ' ฿'; }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    </script>
+	
+</body>
+</html>

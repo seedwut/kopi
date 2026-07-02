@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ใบเสร็จรับเงิน #{{ order.id }}</title>
+    <style>
+        /* ตั้งค่าให้หน้าตาเหมือนใบเสร็จกระดาษความร้อน */
+        body { 
+            font-family: 'Courier New', Courier, monospace, sans-serif; 
+            font-size: 12px; 
+            color: #000; 
+            margin: 0 auto; 
+            padding: 10px; 
+            width: 58mm; /* ขนาดกระดาษสลิปมาตรฐาน */
+        }
+        .center { text-align: center; }
+        .right { text-align: right; }
+        .bold { font-weight: bold; }
+        .divider { border-bottom: 1px dashed #000; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
+        td { vertical-align: top; padding: 3px 0; }
+        
+        /* สไตล์สำหรับโลโก้บนสลิป (แปลงเป็นขาวดำให้เหมาะกับเครื่องพรินต์ความร้อน) */
+        .receipt-logo {
+            width: 45px;
+            height: 45px;
+            object-fit: cover;
+            border-radius: 50%;
+            margin-bottom: 5px;
+            filter: grayscale(100%); 
+        }
+
+        /* ซ่อนปุ่มต่างๆ เวลาสั่งพิมพ์ออกกระดาษจริง */
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body onload="window.print()"> <!-- สั่งให้เด้งหน้าจอ Print อัตโนมัติ -->
+
+    <!-- 📌 ส่วนหัวใบเสร็จพร้อมรูปโลโก้ -->
+    <div class="center">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="KOPI Logo" class="receipt-logo">
+    </div>
+    <div class="center bold" style="font-size: 16px;">KOPI Coffee Van</div>
+    <div class="center" style="margin-bottom: 10px;">ใบเสร็จรับเงิน / Receipt</div>
+    
+    <!-- 📌 แสดงเลขคิวบนสลิป (ปรับขนาดให้เล็กลงพอดีตา) -->
+    <div class="center" style="margin-bottom: 10px; border: 1px solid #000; padding: 4px; border-radius: 4px; width: 80%; margin: 0 auto 15px auto;">
+        <span style="font-size: 12px; color: #333;">คิว / Queue</span><br>
+        <span class="bold" style="font-size: 20px;">{{ order.queue_number or order.id }}</span>
+    </div>
+    
+    <div>รหัสสั่งซื้อ (Order ID): #{{ order.id }}</div>
+    <div>ลูกค้า (Customer): {{ order.customer_name }}</div>
+    <div>เวลา (Time): {{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+    
+    <div class="divider"></div>
+    
+    <table>
+        {% for item in order.items %}
+        <tr>
+            <td style="width: 70%;">
+                {{ item.product_name }} <br>
+                <small>(หวาน {{ item.sweetness }}) x{{ item.quantity }}</small>
+            </td>
+            <td class="right" style="width: 30%;">{{ item.price }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    
+    <div class="divider"></div>
+    
+    <<table>
+        <tr>
+            <td class="bold" style="font-size: 14px;">รวมทั้งสิ้น</td>
+            <td class="bold right" style="font-size: 14px;">{{ order.total_price }} ฿</td>
+        </tr>
+    </table>
+    
+    <div class="divider"></div>
+
+    <!-- 📌 ส่วนแสดง QR Code สำหรับสแกนจ่าย -->
+    <div class="center" style="margin: 10px 0;">
+        <div style="font-size: 12px; margin-bottom: 5px;">สแกนเพื่อชำระเงิน (PromptPay)</div>
+        <!-- อย่าลืมเปลี่ยน qr.png ให้ตรงกับชื่อไฟล์รูปของคุณนะครับ -->
+        <img src="{{ url_for('static', filename='qr.png') }}" alt="QR Code" style="width: 80px; height: 80px; object-fit: contain; filter: grayscale(100%);">
+    </div>
+	<div class="center">นายชาญนภัส ภิรมย์</div>
+
+    <div class="divider"></div>
+
+    <div class="center">ขอบคุณที่ใช้บริการครับ 😊</div>
+
+    <!-- ปุ่มปิดหน้าต่าง (จะไม่ถูกพรินต์ออกมาด้วย) -->
+    <div class="no-print center" style="margin-top: 20px;">
+        <button onclick="window.close()" style="padding: 8px 15px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">ปิดหน้าต่างนี้</button>
+    </div>
+
+</body>
+</html>

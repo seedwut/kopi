@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ชำระเงิน - KOPI Coffee Van</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f9f6f0; color: #333; text-align: center; margin-top: 40px; }
+        .receipt-box { background: white; max-width: 400px; margin: 0 auto; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .qr-image { width: 250px; height: 250px; border: 2px solid #eee; border-radius: 10px; margin: 20px 0; padding: 10px; }
+        .slip-image { width: 100%; max-width: 250px; border-radius: 8px; margin-top: 15px; border: 1px solid #ddd; }
+        .btn { background-color: #28a745; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin-top: 15px; }
+        .btn:hover { background-color: #218838; }
+        .btn-home { background-color: #6f4e37; display: inline-block; text-decoration: none; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="receipt-box">
+        <h2>ออเดอร์ #{{ order.id }}</h2>
+        <p>ลูกค้า: <strong>{{ order.customer_name }}</strong></p>
+        <h1 style="color: #d2691e; margin: 10px 0;">ยอดโอน: {{ order.total_price }} บาท</h1>
+        
+        <hr style="border: 0; border-top: 1px dashed #ccc; margin: 20px 0;">
+
+        {% if not order.slip_image %}
+            <p>📲 <strong>สแกน QR Code เพื่อชำระเงิน</strong></p>
+            
+            <!-- ใช้บริการ PromptPay.io ในการสร้างภาพ QR Code ให้ทันที -->
+            <img src="https://promptpay.io/{{ promptpay_number }}/{{ order.total_price }}.png" class="qr-image" alt="QR Code พร้อมเพย์">
+            
+            <form action="{{ url_for('upload_slip', order_id=order.id) }}" method="POST" enctype="multipart/form-data" style="margin-top: 10px; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 10px;">แนบสลิปการโอนเงิน:</label>
+                <input type="file" name="slip" required accept="image/*" style="width: 100%;">
+                <button type="submit" class="btn">ยืนยันการชำระเงิน</button>
+            </form>
+        {% else %}
+            <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; font-weight: bold;">
+                ✅ ได้รับสลิปเรียบร้อยแล้ว<br>ร้านกำลังเตรียมเครื่องดื่มให้ครับ!
+            </div>
+            <img src="{{ url_for('static', filename='uploads/' + order.slip_image) }}" class="slip-image">
+        {% endif %}
+        
+        <br>
+        <a href="{{ url_for('home') }}" class="btn btn-home">กลับไปหน้าร้าน</a>
+    </div>
+</body>
+</html>
