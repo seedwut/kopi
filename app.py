@@ -29,9 +29,6 @@ def set_shop_status(status):
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# 📌 เพิ่ม 2 บรรทัดนี้ เพื่อให้ Render สร้างตารางฐานข้อมูลอัตโนมัติ
-with app.app_context():
-    db.create_all()
 # ==========================================
 # 1. โครงสร้างฐานข้อมูล (Models)
 # ==========================================
@@ -409,8 +406,7 @@ def update_order_status(order_id, status):
         db.session.commit()
         
     return redirect(url_for('admin_dashboard'))
-    
-if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+if __name__ == '__main__':
+       app.run(debug=True)
