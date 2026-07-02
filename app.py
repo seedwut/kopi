@@ -178,7 +178,7 @@ def checkout():
     thai_time = datetime.utcnow() + timedelta(hours=7)
     start_of_day_utc = datetime(thai_time.year, thai_time.month, thai_time.day) - timedelta(hours=7)
     today_orders_count = Order.query.filter(Order.created_at >= start_of_day_utc).count()
-    new_queue = f"Q{today_orders_count + 1:02d}" # จะได้เป็น Q01, Q02, Q03...
+    new_queue = f"Q{today_orders_count + 1:02d}"
     
     # บันทึกคิวลงออเดอร์
     new_order = Order(customer_name=customer_name, total_price=final_total, queue_number=new_queue)
@@ -192,22 +192,13 @@ def checkout():
             earned_points = final_total // 10
             user.points += earned_points
     
-    # 📌 แสดงเลขคิวในข้อความ LINE
-    msg = f"☕ มีออเดอร์ใหม่! (คิว {new_queue})\n👤 ลูกค้า: {customer_name}\n💰 ยอดรวม: {final_total} บาท\n📝 รายการ:\n"
-    
+    # 📌 บันทึกรายการสินค้าลงฐานข้อมูล (ลบส่วนแจ้งเตือน LINE ออกแล้ว)
     for item in cart:
         qty = item.get('quantity', 1)
         sw = item.get('sweetness', '100%')
         db.session.add(OrderItem(order_id=new_order.id, product_name=item['name'], price=item['price'] * qty, quantity=qty, sweetness=sw))
-        msg += f"- {item['name']} (หวาน {sw}) x{qty}\n"
     
     db.session.commit()
-    
-    try:
-        line_token = "NRscL9JJEUEHOp9jn8hmKjhFJc7zCmJdAPwQ02UxICcjlncwiHbwcIiOTzR7JkoQZpugb++0k0nkhm4gbmkE9i4dIhXQ63nwkw7IO1MI4KjwNcw11IpGrdE1Ntcy4uHrow2BcesRH6pTjsjIZd5RGgdB04t89/1O/w1cDnyilFU="
-        admin_user_id = "Ue3c076dc502fc6fc8f03566806705e7e"
-        requests.post("https://api.line.me/v2/bot/message/push", headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {line_token}'}, json={"to": admin_user_id, "messages": [{"type": "text", "text": msg}]})
-    except: pass
 
     session.pop('cart', None)
     if earned_points > 0: flash(f"สั่งซื้อสำเร็จ! ได้รับ {earned_points} แต้มสะสม", "success")
