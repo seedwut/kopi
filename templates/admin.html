@@ -174,7 +174,7 @@
             <button type="submit" class="btn btn-success">➕ เพิ่มเมนู</button>
         </form>
         
-        <!-- ตารางแสดงเมนูทั้งหมด -->
+ <!-- ตารางแสดงเมนูทั้งหมด -->
         <table>
             <thead>
                 <tr>
@@ -194,10 +194,25 @@
                             <div style="font-size: 30px;">☕</div>
                         {% endif %}
                     </td>
-                    <td>{{ p.name }}</td>
+                    <td><strong>{{ p.name }}</strong></td>
                     <td>{{ p.price }} ฿</td>
-                    <td style="text-align: center;">
+                    <td style="display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
+                        <!-- 📌 ปุ่มกดแก้ไขเมนู (จะโชว์ฟอร์มที่ซ่อนอยู่) -->
+                        <button onclick="document.getElementById('edit-form-{{ p.id }}').style.display='table-row'" class="btn" style="background-color: #f39c12; color: white;">✏️ แก้ไข</button>
                         <a href="{{ url_for('delete_product', product_id=p.id) }}" class="btn btn-danger" onclick="return confirm('ต้องการลบเมนู {{ p.name }} ใช่ไหม?');">🗑️ ลบ</a>
+                    </td>
+                </tr>
+                <!-- 📌 ฟอร์มซ่อนสำหรับอัปเดตข้อมูลเมนู (จะโผล่มาเมื่อกดปุ่มแก้ไข) -->
+                <tr id="edit-form-{{ p.id }}" style="display: none; background-color: #fdfbf7;">
+                    <td colspan="4" style="padding: 15px; border-bottom: 2px solid #ddd;">
+                        <form action="{{ url_for('edit_product', product_id=p.id) }}" method="POST" enctype="multipart/form-data" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: center;">
+                            <strong style="color: #4a3b32;">แก้ไข:</strong>
+                            <input type="text" name="name" value="{{ p.name }}" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
+                            <input type="number" name="price" value="{{ p.price }}" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
+                            <input type="file" name="image" accept="image/*" style="padding: 5px; width: 200px; font-size: 12px;">
+                            <button type="submit" class="btn btn-success">💾 บันทึก</button>
+                            <button type="button" onclick="document.getElementById('edit-form-{{ p.id }}').style.display='none'" class="btn btn-danger">❌ ปิด</button>
+                        </form>
                     </td>
                 </tr>
                 {% else %}
