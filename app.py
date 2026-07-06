@@ -6,6 +6,16 @@ from datetime import datetime, timedelta
 import os
 import uuid
 import requests
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
+# 📌 ตั้งค่า Cloudinary (เอาค่าที่ก๊อปปี้มาใส่ตรงนี้ในเครื่องหมายคำพูด)
+cloudinary.config( 
+  cloud_name = "ใส่_CLOUD_NAME_ของคุณ", 
+  api_key = "ใส่_API_KEY_ของคุณ", 
+  api_secret = "ใส่_API_SECRET_ของคุณ" 
+)
 
 app = Flask(__name__)
 app.secret_key = 'kopi_super_secret_key'
@@ -228,10 +238,11 @@ def upload_slip(order_id):
     order = Order.query.get_or_404(order_id)
     slip = request.files.get('slip')
     if slip and allowed_file(slip.filename):
-        ext = slip.filename.rsplit('.', 1)[1].lower()
-        filename = f"slip_{order.id}_{uuid.uuid4().hex}.{ext}"
-        slip.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        order.slip_image = filename
+        # 📌 ส่งรูปขึ้น Cloudinary
+        upload_result = cloudinary.uploader.upload(slip)
+        # 📌 เอาลิงก์รูปมาเซฟลงฐานข้อมูล
+        order.slip_image = upload_result.get('secure_url')
+        
         order.status = 'Paid'
         db.session.commit()
         flash("แนบสลิปเรียบร้อยแล้ว!", "success")
@@ -338,21 +349,19 @@ def add_product():
     if not is_admin_logged_in(): return redirect(url_for('admin_login'))
     name = request.form.get('name')
     price = request.form.get('price')
-    image = request.files.get('image') # รับไฟล์รูปภาพ
+    image = request.files.get('image')
     
-    image_filename = None
-    # ถ้าร้านอัปโหลดรูปมาด้วย ให้บันทึกรูป
+    image_url = None
     if image and allowed_file(image.filename):
-        ext = image.filename.rsplit('.', 1)[1].lower()
-        image_filename = f"product_{uuid.uuid4().hex}.{ext}"
-        image.save(os.path.join(app.config['UPLOAD_FOLDER'], image_filename))
+        # 📌 ส่งรูปขึ้น Cloudinary
+        upload_result = cloudinary.uploader.upload(image)
+        image_url = upload_result.get('secure_url')
 
     if name and price:
-        db.session.add(Product(name=name, price=int(price), image_file=image_filename))
+        db.session.add(Product(name=name, price=int(price), image_file=image_url))
         db.session.commit()
         flash(f"เพิ่มเมนู {name} ลงในร้านเรียบร้อย!", "success")
     return redirect(url_for('admin_dashboard'))
-
 # 📌 โค้ดสำหรับให้แอดมินกด "ลบเมนู"
 @app.route('/admin/delete_product/<int:product_id>')
 def delete_product(product_id):
@@ -379,15 +388,12 @@ def edit_product(product_id):
     product.name = request.form.get('name', product.name)
     product.price = request.form.get('price', product.price)
     
-    # ถ้ามีการอัปโหลดรูปภาพใหม่
+  # ถ้ามีการอัปโหลดรูปภาพใหม่
     image = request.files.get('image')
     if image and allowed_file(image.filename):
-        # ลบไฟล์รูปเก่าทิ้ง (เพื่อประหยัดพื้นที่)
-        if product.image_file:
-            old_path = os.path.join(app.config['UPLOAD_FOLDER'], product.image_file)
-            if os.path.exists(old_path): 
-                try: os.remove(old_path)
-                except: pass
+        # 📌 ส่งรูปขึ้น Cloudinary
+        upload_result = cloudinary.uploader.upload(image)
+        product.image_file = upload_result.get('secure_url')
         
         # เซฟไฟล์รูปใหม่
         ext = image.filename.rsplit('.', 1)[1].lower()
