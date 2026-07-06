@@ -16,7 +16,8 @@ app.secret_key = 'kopi_super_secret_key'
 cloudinary.config( 
   cloud_name = "c4bv5dn1", 
   api_key = "139226624388126", 
-  api_secret = "krpvuENcaLDTyrGl1ovQQLBsNxg" 
+  api_secret = "krpvuENcaLDTyrGl1ovQQLBsNxg"
+  api_proxy = "http://proxy.server:3128"  # 📌 เพิ่มบรรทัดนี้เข้ามาครับ!
 )
 
 # 📌 ตั้งค่าฐานข้อมูล: ใช้ PostgreSQL บน Cloud หรือใช้ SQLite ตอนทำในคอม
