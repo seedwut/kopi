@@ -81,14 +81,13 @@
             {% for product in products %}
             <div class="product-card">
                 
-                <!-- 📌 เพิ่มส่วนแสดงรูปภาพเครื่องดื่ม -->
+<!-- 📌 เพิ่มส่วนแสดงรูปภาพเครื่องดื่ม -->
                 {% if product.image_file %}
-                    {% if product.image_file %}
-    <img src="{{ product.image_file }}" alt="{{ product.name }}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 15px;">
-{% else %}
-    <div style="width: 100%; height: 200px; background-color: #f1efeb; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; font-size: 60px;">☕</div>
-{% endif %}
+                    <img src="{{ product.image_file }}" alt="{{ product.name }}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 15px;">
                 {% else %}
+                    <!-- ถ้าไม่มีรูป ให้โชว์กล่องสีเทาๆ มีแก้วกาแฟแทน -->
+                    <div style="width: 100%; height: 200px; background-color: #f1efeb; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; font-size: 60px;">☕</div>
+                {% endif %}
                     <!-- ถ้าไม่มีรูป ให้โชว์กล่องสีเทาๆ มีแก้วกาแฟแทน -->
                     <div style="width: 100%; height: 200px; background-color: #f1efeb; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; font-size: 60px;">☕</div>
                 {% endif %}
