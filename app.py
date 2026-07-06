@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-# แก้ไขบรรทัดนี้ให้เป็นแบบนี้ครับ
 from datetime import datetime, timedelta
 import os
 import uuid
@@ -10,32 +9,28 @@ import cloudinary
 import cloudinary.uploader
 import cloudinary.api
 
-# 📌 ตั้งค่า Cloudinary (เอาค่าที่ก๊อปปี้มาใส่ตรงนี้ในเครื่องหมายคำพูด)
+app = Flask(__name__)
+app.secret_key = 'kopi_super_secret_key'
+
+# 📌 ตั้งค่า Cloudinary (เอาค่าจากเว็บ Cloudinary มาใส่ตรงนี้ครับ)
 cloudinary.config( 
   cloud_name = "ใส่_CLOUD_NAME_ของคุณ", 
   api_key = "ใส่_API_KEY_ของคุณ", 
   api_secret = "ใส่_API_SECRET_ของคุณ" 
 )
 
-app = Flask(__name__)
-app.secret_key = 'kopi_super_secret_key'
-
 # 📌 ตั้งค่าฐานข้อมูล: ใช้ PostgreSQL บน Cloud หรือใช้ SQLite ตอนทำในคอม
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///coffee_shop.db')
-
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
-
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # 📌 ฟังก์ชันอ่านและบันทึกสถานะร้าน
 def is_shop_open():
     if not os.path.exists('shop_status.txt'): 
-        return True # ค่าเริ่มต้นคือเปิดร้าน
+        return True
     with open('shop_status.txt', 'r') as f: 
         return f.read().strip() == 'open'
 
@@ -63,12 +58,12 @@ class User(db.Model):
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    queue_number = db.Column(db.String(10), nullable=True) # 📌 เพิ่มคอลัมน์เก็บเลขคิว
+    queue_number = db.Column(db.String(10), nullable=True)
     customer_name = db.Column(db.String(100), nullable=False)
     total_price = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(50), default='Pending') 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    slip_image = db.Column(db.String(200), nullable=True)
+    slip_image = db.Column(db.String(500), nullable=True) # ขยายขนาดเผื่อลิงก์ Cloudinary ยาว
     items = db.relationship('OrderItem', backref='order', lazy=True, cascade="all, delete-orphan")
 
 class OrderItem(db.Model):
@@ -96,7 +91,6 @@ def home():
         current_user = User.query.get(session['user_id'])
     
     products = Product.query.all()
-    # 📌 ส่งสถานะร้านไปที่ index.html
     return render_template('index.html', products=products, cart=cart, current_user=current_user, shop_open=is_shop_open())
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -142,13 +136,10 @@ def add_to_cart(product_id):
     product = Product.query.get(product_id)
     if product:
         sweetness = request.form.get('sweetness', '100%')
-        drink_type = request.form.get('drink_type', 'เย็น') # รับค่า ร้อน/เย็น
-        
-        # 📌 ราคาเดียวกันหมด ไม่ต้องบวกเพิ่ม
+        drink_type = request.form.get('drink_type', 'เย็น')
         final_price = product.price
         
         cart = session.get('cart', [])
-        
         found = False
         for item in cart:
             if item['id'] == product.id and item.get('sweetness') == sweetness and item.get('drink_type') == drink_type:
@@ -184,13 +175,12 @@ def checkout():
             
     final_total = max(0, total_price - discount)
     
-    # 📌 ระบบคำนวณคิวประจำวัน (อิงเวลาไทย +7)
+    # 📌 ระบบคำนวณคิว
     thai_time = datetime.utcnow() + timedelta(hours=7)
     start_of_day_utc = datetime(thai_time.year, thai_time.month, thai_time.day) - timedelta(hours=7)
     today_orders_count = Order.query.filter(Order.created_at >= start_of_day_utc).count()
     new_queue = f"Q{today_orders_count + 1:02d}"
     
-    # บันทึกคิวลงออเดอร์
     new_order = Order(customer_name=customer_name, total_price=final_total, queue_number=new_queue)
     db.session.add(new_order)
     db.session.flush() 
@@ -202,7 +192,6 @@ def checkout():
             earned_points = final_total // 10
             user.points += earned_points
     
-    # 📌 เตรียมข้อความแจ้งเตือนผ่าน LINE
     msg = f"☕ มีออเดอร์ใหม่! (คิว {new_queue})\n👤 ลูกค้า: {customer_name}\n💰 ยอดรวม: {final_total} บาท\n📝 รายการ:\n"
     
     for item in cart:
@@ -213,21 +202,19 @@ def checkout():
     
     db.session.commit()
     
-    # 📌 ระบบส่งข้อความเข้า LINE (กลับมาแล้ว!)
+    # 📌 ระบบส่ง LINE
     try:
         line_token = "NRscL9JJEUEHOp9jn8hmKjhFJc7zCmJdAPwQ02UxICcjlncwiHbwcIiOTzR7JkoQZpugb++0k0nkhm4gbmkE9i4dIhXQ63nwkw7IO1MI4KjwNcw11IpGrdE1Ntcy4uHrow2BcesRH6pTjsjIZd5RGgdB04t89/1O/w1cDnyilFU="
         admin_user_id = "Ue3c076dc502fc6fc8f03566806705e7e"
-        requests.post("https://api.line.me/v2/bot/message/push", 
-                      headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {line_token}'}, 
-                      json={"to": admin_user_id, "messages": [{"type": "text", "text": msg}]})
-    except Exception as e: 
-        print(f"LINE Error: {e}")
+        requests.post("https://api.line.me/v2/bot/message/push", headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {line_token}'}, json={"to": admin_user_id, "messages": [{"type": "text", "text": msg}]})
+    except: pass
 
     session.pop('cart', None)
     if earned_points > 0: flash(f"สั่งซื้อสำเร็จ! ได้รับ {earned_points} แต้มสะสม", "success")
     return redirect(url_for('receipt', order_id=new_order.id))
+
 # ==========================================
-# 4. ระบบชำระเงินและสลิป
+# 4. ระบบชำระเงินและสลิป (Cloudinary)
 # ==========================================
 @app.route('/receipt/<int:order_id>')
 def receipt(order_id):
@@ -238,9 +225,8 @@ def upload_slip(order_id):
     order = Order.query.get_or_404(order_id)
     slip = request.files.get('slip')
     if slip and allowed_file(slip.filename):
-        # 📌 ส่งรูปขึ้น Cloudinary
+        # 📌 อัปโหลดสลิปขึ้น Cloudinary
         upload_result = cloudinary.uploader.upload(slip)
-        # 📌 เอาลิงก์รูปมาเซฟลงฐานข้อมูล
         order.slip_image = upload_result.get('secure_url')
         
         order.status = 'Paid'
@@ -276,16 +262,12 @@ def admin_dashboard():
     if not is_admin_logged_in(): return redirect(url_for('admin_login'))
     orders = Order.query.order_by(Order.created_at.desc()).all()
     
-    # 📌 คำนวณยอดขายย้อนหลัง 7 วัน
     today = datetime.utcnow().date()
     date_dict = {}
-    
-    # สร้างวันที่ย้อนหลัง 7 วัน (ตั้งค่าเริ่มต้นยอดขายเป็น 0)
     for i in range(6, -1, -1):
         day = today - timedelta(days=i)
         date_dict[day.strftime('%d/%m')] = 0
         
-    # รวมยอดขายเฉพาะออเดอร์ที่ "Completed"
     for o in orders:
         if o.status == 'Completed':
             order_date = o.created_at.date().strftime('%d/%m')
@@ -303,45 +285,36 @@ def admin_dashboard():
                            products=Product.query.all(),
                            users=User.query.all(),
                            shop_open=is_shop_open(),
-                           sales_labels=sales_labels, # 📌 ส่งข้อมูลวันที่ไปทำกราฟ
-                           sales_values=sales_values) # 📌 ส่งข้อมูลยอดขายไปทำกราฟ
+                           sales_labels=sales_labels,
+                           sales_values=sales_values)
 
-# 📌 โค้ดสำหรับแอดมินกดเปิด-ปิดร้าน
 @app.route('/admin/toggle_status')
 def toggle_status():
     if not is_admin_logged_in(): return redirect(url_for('admin_login'))
-    
     current_status = is_shop_open()
     set_shop_status('closed' if current_status else 'open')
     flash("อัปเดตสถานะร้านเรียบร้อยแล้ว!", "success")
     return redirect(url_for('admin_dashboard'))
-# 📌 โค้ดสำหรับให้แอดมินเปลี่ยนรหัสผ่านให้ลูกค้า
+
 @app.route('/admin/reset_password/<int:user_id>', methods=['POST'])
 def admin_reset_password(user_id):
     if not is_admin_logged_in(): return redirect(url_for('admin_login'))
-    
     user = User.query.get_or_404(user_id)
     new_password = request.form.get('new_password')
-    
     if new_password:
         user.password = new_password
         db.session.commit()
         flash(f"เปลี่ยนรหัสผ่านให้คุณ {user.username} เรียบร้อย!", "success")
-        
     return redirect(url_for('admin_dashboard'))
 
-# 📌 โค้ดสำหรับให้แอดมินลบสมาชิกลูกค้า
 @app.route('/admin/delete_user/<int:user_id>')
 def admin_delete_user(user_id):
     if not is_admin_logged_in(): return redirect(url_for('admin_login'))
-    
     user = User.query.get_or_404(user_id)
     username = user.username
-    
     db.session.delete(user)
     db.session.commit()
     flash(f"ลบบัญชีผู้ใช้ {username} ออกจากระบบเรียบร้อยแล้ว", "success")
-    
     return redirect(url_for('admin_dashboard'))
                            
 @app.route('/admin/add_product', methods=['POST'])
@@ -353,7 +326,7 @@ def add_product():
     
     image_url = None
     if image and allowed_file(image.filename):
-        # 📌 ส่งรูปขึ้น Cloudinary
+        # 📌 อัปโหลดรูปเมนูขึ้น Cloudinary
         upload_result = cloudinary.uploader.upload(image)
         image_url = upload_result.get('secure_url')
 
@@ -362,49 +335,34 @@ def add_product():
         db.session.commit()
         flash(f"เพิ่มเมนู {name} ลงในร้านเรียบร้อย!", "success")
     return redirect(url_for('admin_dashboard'))
-# 📌 โค้ดสำหรับให้แอดมินกด "ลบเมนู"
-@app.route('/admin/delete_product/<int:product_id>')
-def delete_product(product_id):
-    if not is_admin_logged_in(): return redirect(url_for('admin_login'))
-    product = Product.query.get_or_404(product_id)
-    
-    # ถ้ามีรูปอยู่ ให้ลบไฟล์รูปออกจากเครื่องด้วยเพื่อประหยัดพื้นที่
-    if product.image_file:
-        path = os.path.join(app.config['UPLOAD_FOLDER'], product.image_file)
-        if os.path.exists(path): os.remove(path)
-        
-    db.session.delete(product)
-    db.session.commit()
-    flash("ลบเมนูออกจากร้านเรียบร้อย!", "success")
-    return redirect(url_for('admin_dashboard'))
 
-# 📌 โค้ดสำหรับให้แอดมินแก้ไขเมนูและเปลี่ยนรูปภาพ
 @app.route('/admin/edit_product/<int:product_id>', methods=['POST'])
 def edit_product(product_id):
     if not is_admin_logged_in(): return redirect(url_for('admin_login'))
     product = Product.query.get_or_404(product_id)
     
-    # อัปเดตชื่อและราคา
     product.name = request.form.get('name', product.name)
     product.price = request.form.get('price', product.price)
     
-  # ถ้ามีการอัปโหลดรูปภาพใหม่
     image = request.files.get('image')
     if image and allowed_file(image.filename):
-        # 📌 ส่งรูปขึ้น Cloudinary
+        # 📌 อัปโหลดรูปเมนูใหม่ขึ้น Cloudinary
         upload_result = cloudinary.uploader.upload(image)
         product.image_file = upload_result.get('secure_url')
-        
-        # เซฟไฟล์รูปใหม่
-        ext = image.filename.rsplit('.', 1)[1].lower()
-        filename = f"product_{uuid.uuid4().hex}.{ext}"
-        image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        product.image_file = filename
         
     db.session.commit()
     flash(f"อัปเดตข้อมูลเมนู {product.name} เรียบร้อย!", "success")
     return redirect(url_for('admin_dashboard'))
-    
+
+@app.route('/admin/delete_product/<int:product_id>')
+def delete_product(product_id):
+    if not is_admin_logged_in(): return redirect(url_for('admin_login'))
+    product = Product.query.get_or_404(product_id)
+    db.session.delete(product)
+    db.session.commit()
+    flash("ลบเมนูออกจากร้านเรียบร้อย!", "success")
+    return redirect(url_for('admin_dashboard'))
+
 @app.route('/admin/complete/<int:order_id>')
 def complete_order(order_id):
     if not is_admin_logged_in(): return redirect(url_for('admin_login'))
@@ -417,9 +375,6 @@ def complete_order(order_id):
 def delete_order(order_id):
     if not is_admin_logged_in(): return redirect(url_for('admin_login'))
     order = Order.query.get_or_404(order_id)
-    if order.slip_image:
-        path = os.path.join(app.config['UPLOAD_FOLDER'], order.slip_image)
-        if os.path.exists(path): os.remove(path)
     db.session.delete(order)
     db.session.commit()
     return redirect(url_for('admin_dashboard'))
@@ -430,22 +385,18 @@ def check_updates():
     latest = Order.query.order_by(Order.id.desc()).first()
     return {"latest_id": latest.id if latest else 0}
 
-# 📌 โค้ดสำหรับดึงข้อมูลไปพิมพ์ใบเสร็จ (สลิปแปะแก้ว)
 @app.route('/admin/print/<int:order_id>')
 def print_receipt(order_id):
     if not is_admin_logged_in(): 
         return redirect(url_for('admin_login'))
-        
     order = Order.query.get_or_404(order_id)
     return render_template('print_receipt.html', order=order)
     
-# 📌 โค้ดสำหรับอัปเดตสถานะออเดอร์แบบละเอียด
 @app.route('/admin/update_status/<int:order_id>/<status>')
 def update_order_status(order_id, status):
     if not is_admin_logged_in(): return redirect(url_for('admin_login'))
     
     order = Order.query.get_or_404(order_id)
-    # เช็คว่าสถานะที่ส่งมาถูกต้องไหม
     if status in ['Pending', 'Paid', 'Brewing', 'Ready', 'Completed']:
         order.status = status
         db.session.commit()
